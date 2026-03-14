@@ -71,6 +71,7 @@ if let path = initialFilePath {
 
 // Launch the app
 let app = NSApplication.shared
+app.setActivationPolicy(.regular)  // Show menu bar and Dock icon
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()
