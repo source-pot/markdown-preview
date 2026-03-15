@@ -72,6 +72,7 @@ if let path = initialFilePath {
 // Launch the app
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)  // Show menu bar and Dock icon
+app.applicationIconImage = AppIcon.create()  // Set custom icon before app appears
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let appState = AppState()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppIcon.setAsAppIcon()
         setupMenuBar()
 
         // Check for initial file from CLI
