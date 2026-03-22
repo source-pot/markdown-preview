@@ -5,11 +5,33 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        WebView(
-            markdown: appState.markdownContent,
-            theme: ThemeManager.shared.currentTheme,
-            refreshTrigger: appState.refreshTrigger
-        )
+        if let tree = appState.directoryTree {
+            NavigationSplitView {
+                DirectoryBrowser(rootNode: tree)
+                    .environmentObject(appState)
+                    .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 350)
+            } detail: {
+                markdownDetailView
+            }
+        } else {
+            markdownDetailView
+        }
+    }
+
+    private var markdownDetailView: some View {
+        Group {
+            if appState.markdownContent.isEmpty && appState.rootDirectory != nil {
+                Text("Select a Markdown file from the sidebar")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                WebView(
+                    markdown: appState.markdownContent,
+                    theme: ThemeManager.shared.currentTheme,
+                    refreshTrigger: appState.refreshTrigger
+                )
+            }
+        }
         .frame(minWidth: 400, minHeight: 300)
     }
 }

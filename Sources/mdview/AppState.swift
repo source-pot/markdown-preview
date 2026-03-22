@@ -5,19 +5,40 @@ class AppState: ObservableObject {
     @Published var currentFile: URL?
     @Published var markdownContent: String = ""
     @Published var refreshTrigger: UUID = UUID()
+    @Published var rootDirectory: URL?
+    @Published var directoryTree: DirectoryNode?
 
     private var fileWatcher: FileWatcher?
+    private var directoryWatcher: DirectoryWatcher?
 
     func openFile(_ url: URL) {
+        stopWatchingFile()
         currentFile = url
         loadContent()
-        startWatching()
+        startWatchingFile()
+    }
+
+    func openDirectory(_ url: URL) {
+        rootDirectory = url
+        scanDirectory()
+        if let first = directoryTree?.firstMarkdownFile() {
+            openFile(first)
+        }
+        startWatchingDirectory()
+    }
+
+    func scanDirectory() {
+        guard let root = rootDirectory else { return }
+        directoryTree = DirectoryNode.scan(directory: root)
     }
 
     func closeFile() {
-        stopWatching()
+        stopWatchingFile()
+        stopWatchingDirectory()
         currentFile = nil
         markdownContent = ""
+        rootDirectory = nil
+        directoryTree = nil
     }
 
     func loadContent() {
@@ -34,7 +55,7 @@ class AppState: ObservableObject {
         refreshTrigger = UUID()
     }
 
-    private func startWatching() {
+    private func startWatchingFile() {
         guard let url = currentFile else { return }
 
         fileWatcher = FileWatcher(url: url) { [weak self] in
@@ -45,8 +66,23 @@ class AppState: ObservableObject {
         fileWatcher?.start()
     }
 
-    private func stopWatching() {
+    private func stopWatchingFile() {
         fileWatcher?.stop()
         fileWatcher = nil
+    }
+
+    private func startWatchingDirectory() {
+        guard let root = rootDirectory else { return }
+
+        directoryWatcher = DirectoryWatcher(rootURL: root) { [weak self] in
+            self?.scanDirectory()
+            self?.startWatchingDirectory()
+        }
+        directoryWatcher?.start()
+    }
+
+    private func stopWatchingDirectory() {
+        directoryWatcher?.stop()
+        directoryWatcher = nil
     }
 }

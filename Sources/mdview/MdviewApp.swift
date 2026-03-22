@@ -1,16 +1,22 @@
 import AppKit
+import Combine
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow?
     let appState = AppState()
+    private var titleObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppIcon.setAsAppIcon()
         setupMenuBar()
 
-        // Check for initial file from CLI
-        if let path = UserDefaults.standard.string(forKey: "initialFilePath") {
+        // Check for initial directory or file from CLI
+        if let path = UserDefaults.standard.string(forKey: "initialDirectoryPath") {
+            UserDefaults.standard.removeObject(forKey: "initialDirectoryPath")
+            appState.openDirectory(URL(fileURLWithPath: path))
+            showWindow()
+        } else if let path = UserDefaults.standard.string(forKey: "initialFilePath") {
             UserDefaults.standard.removeObject(forKey: "initialFilePath")
             appState.openFile(URL(fileURLWithPath: path))
             showWindow()
@@ -65,6 +71,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         themeMenuItem.submenu = themeMenu
         viewMenu.addItem(themeMenuItem)
+        viewMenu.addItem(NSMenuItem.separator())
+        viewMenu.addItem(withTitle: "Toggle Sidebar", action: #selector(NSSplitViewController.toggleSidebar(_:)), keyEquivalent: "s").keyEquivalentModifierMask = [.command, .control]
 
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
@@ -92,8 +100,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let contentView = ContentView()
             .environmentObject(appState)
 
+        let width: CGFloat = appState.rootDirectory != nil ? 1100 : 800
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: width, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -106,10 +115,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window?.delegate = self
 
         updateWindowTitle()
+
+        titleObserver = appState.$currentFile
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateWindowTitle() }
     }
 
     func updateWindowTitle() {
-        if let url = appState.currentFile {
+        if let dir = appState.rootDirectory {
+            if let file = appState.currentFile {
+                window?.title = "\(file.lastPathComponent) — \(dir.lastPathComponent)"
+            } else {
+                window?.title = dir.lastPathComponent
+            }
+        } else if let url = appState.currentFile {
             window?.title = url.lastPathComponent
         } else {
             window?.title = "mdview"
@@ -120,14 +139,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.init(filenameExtension: "md")!]
         panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
+        panel.canChooseDirectories = true
         panel.canChooseFiles = true
-        panel.message = "Select a Markdown file to preview"
+        panel.message = "Select a Markdown file or directory to preview"
 
         let response = panel.runModal()
 
         if response == .OK, let url = panel.url {
-            appState.openFile(url)
+            if url.hasDirectoryPath {
+                appState.openDirectory(url)
+            } else {
+                appState.openFile(url)
+            }
             showWindow()
         } else {
             NSApp.terminate(nil)

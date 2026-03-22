@@ -7,7 +7,8 @@ A native macOS markdown previewer with syntax highlighting and live reload.
 - Native macOS app built with Swift and SwiftUI
 - Syntax highlighting for code blocks (highlight.js)
 - Light, Dark, and Auto (system) themes
-- Auto-refresh when the file changes on disk
+- Directory browsing with sidebar file tree
+- Auto-refresh when files or directories change on disk
 - Serif typography for headings
 - GitHub-inspired styling
 - Launches as a standalone GUI app (detaches from terminal)
@@ -49,9 +50,17 @@ mdview document.md
 
 The app launches as a standalone GUI window and returns control to the terminal immediately.
 
+### Open a directory
+
+```bash
+mdview docs/
+```
+
+Opens a sidebar showing all markdown files and subdirectories. Click a file to preview it.
+
 ### Open via file dialog
 
-Run without arguments to show a file picker:
+Run without arguments to show a file/directory picker:
 
 ```bash
 mdview
@@ -61,6 +70,7 @@ mdview
 
 - The preview window opens with the rendered markdown
 - Edit the file in your editor; the preview auto-refreshes on save
+- In directory mode, the sidebar updates automatically when files are added or removed
 - Close the window to return to the file picker
 - Cancel the file picker to quit the app
 
@@ -84,9 +94,12 @@ mdview/
 │   ├── main.swift              # CLI entry point (forks to detach from terminal)
 │   ├── MdviewApp.swift         # App delegate and window management
 │   ├── AppState.swift          # Observable state
-│   ├── ContentView.swift       # WKWebView wrapper
+│   ├── ContentView.swift       # WKWebView wrapper with optional sidebar
+│   ├── DirectoryNode.swift     # File tree data model
+│   ├── DirectoryBrowser.swift  # Sidebar directory browser view
 │   ├── MarkdownRenderer.swift  # Markdown to HTML conversion
 │   ├── FileWatcher.swift       # File change monitoring
+│   ├── DirectoryWatcher.swift  # Directory change monitoring
 │   ├── ThemeManager.swift      # Theme preferences
 │   └── Resources/
 │       ├── style.css           # Light/dark theme styles

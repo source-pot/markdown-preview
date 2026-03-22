@@ -5,7 +5,7 @@ import SwiftUI
 let isDetached = ProcessInfo.processInfo.environment["MDVIEW_DETACHED"] == "1"
 
 if !isDetached {
-    // Parse command line arguments and validate file exists before detaching
+    // Parse command line arguments and validate path exists before detaching
     var filePath: String? = nil
 
     if CommandLine.arguments.count > 1 {
@@ -14,7 +14,7 @@ if !isDetached {
         if FileManager.default.fileExists(atPath: url.path) {
             filePath = url.path
         } else {
-            fputs("Error: File not found: \(path)\n", stderr)
+            fputs("Error: Path not found: \(path)\n", stderr)
             exit(1)
         }
     }
@@ -54,19 +54,25 @@ if !isDetached {
 // Detached child process continues here...
 
 // Parse command line arguments
-var initialFilePath: String? = nil
+var initialPath: String? = nil
+var initialPathIsDirectory = false
 
 if CommandLine.arguments.count > 1 {
     let path = CommandLine.arguments[1]
     let url = URL(fileURLWithPath: path).standardizedFileURL
-    initialFilePath = url.path
+    initialPath = url.path
+    var isDir: ObjCBool = false
+    if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) {
+        initialPathIsDirectory = isDir.boolValue
+    }
 }
 
-// Store the initial file path for the app to use
-if let path = initialFilePath {
-    UserDefaults.standard.set(path, forKey: "initialFilePath")
-} else {
-    UserDefaults.standard.removeObject(forKey: "initialFilePath")
+// Store the initial path for the app to use
+UserDefaults.standard.removeObject(forKey: "initialFilePath")
+UserDefaults.standard.removeObject(forKey: "initialDirectoryPath")
+if let path = initialPath {
+    let key = initialPathIsDirectory ? "initialDirectoryPath" : "initialFilePath"
+    UserDefaults.standard.set(path, forKey: key)
 }
 
 // Launch the app
