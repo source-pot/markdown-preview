@@ -113,6 +113,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window?.contentView = NSHostingView(rootView: contentView)
         window?.makeKeyAndOrderFront(nil)
         window?.delegate = self
+        NSApp.activate(ignoringOtherApps: true)
 
         updateWindowTitle()
 
