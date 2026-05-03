@@ -7,9 +7,9 @@ class AppState: ObservableObject {
     @Published var refreshTrigger: UUID = UUID()
     @Published var rootDirectory: URL?
     @Published var directoryTree: DirectoryNode?
+    @Published var selectedNodeURL: URL?
 
     private var fileWatcher: FileWatcher?
-    private var directoryWatcher: DirectoryWatcher?
 
     func openFile(_ url: URL) {
         stopWatchingFile()
@@ -20,25 +20,19 @@ class AppState: ObservableObject {
 
     func openDirectory(_ url: URL) {
         rootDirectory = url
-        scanDirectory()
-        if let first = directoryTree?.firstMarkdownFile() {
-            openFile(first)
-        }
-        startWatchingDirectory()
-    }
-
-    func scanDirectory() {
-        guard let root = rootDirectory else { return }
-        directoryTree = DirectoryNode.scan(directory: root)
+        let root = DirectoryNode.make(url: url)
+        root.loadChildrenIfNeeded()
+        directoryTree = root
+        selectedNodeURL = nil
     }
 
     func closeFile() {
         stopWatchingFile()
-        stopWatchingDirectory()
         currentFile = nil
         markdownContent = ""
         rootDirectory = nil
         directoryTree = nil
+        selectedNodeURL = nil
     }
 
     func loadContent() {
@@ -55,6 +49,52 @@ class AppState: ObservableObject {
         refreshTrigger = UUID()
     }
 
+    func refreshCurrentDirectory() {
+        guard let tree = directoryTree else { return }
+
+        let target: DirectoryNode
+        if let selURL = selectedNodeURL, let node = findNode(in: tree, url: selURL) {
+            if node.isDirectory {
+                target = node
+            } else {
+                target = parent(of: node, in: tree) ?? tree
+            }
+        } else if let curFile = currentFile,
+                  let parentDir = findNode(in: tree, url: curFile.deletingLastPathComponent()) {
+            target = parentDir
+        } else {
+            target = tree
+        }
+
+        target.refresh()
+
+        if let curFile = currentFile, curFile.deletingLastPathComponent() == target.url {
+            let stillThere = (target.children ?? []).contains { $0.url == curFile }
+            if !stillThere {
+                stopWatchingFile()
+                currentFile = nil
+                markdownContent = ""
+                selectedNodeURL = (target.url == tree.url) ? nil : target.url
+            }
+        }
+    }
+
+    private func findNode(in node: DirectoryNode, url: URL) -> DirectoryNode? {
+        if node.url == url { return node }
+        for child in node.children ?? [] {
+            if let found = findNode(in: child, url: url) { return found }
+        }
+        return nil
+    }
+
+    private func parent(of target: DirectoryNode, in node: DirectoryNode) -> DirectoryNode? {
+        for child in node.children ?? [] {
+            if child.url == target.url { return node }
+            if let found = parent(of: target, in: child) { return found }
+        }
+        return nil
+    }
+
     private func startWatchingFile() {
         guard let url = currentFile else { return }
 
@@ -69,20 +109,5 @@ class AppState: ObservableObject {
     private func stopWatchingFile() {
         fileWatcher?.stop()
         fileWatcher = nil
-    }
-
-    private func startWatchingDirectory() {
-        guard let root = rootDirectory else { return }
-
-        directoryWatcher = DirectoryWatcher(rootURL: root) { [weak self] in
-            self?.scanDirectory()
-            self?.startWatchingDirectory()
-        }
-        directoryWatcher?.start()
-    }
-
-    private func stopWatchingDirectory() {
-        directoryWatcher?.stop()
-        directoryWatcher = nil
     }
 }

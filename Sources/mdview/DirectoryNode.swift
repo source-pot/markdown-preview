@@ -1,27 +1,42 @@
 import Foundation
+import Combine
 
-struct DirectoryNode: Identifiable, Hashable {
+final class DirectoryNode: ObservableObject, Identifiable, Hashable {
     let id: URL
     let url: URL
     let name: String
     let isDirectory: Bool
-    var children: [DirectoryNode]?
 
-    static func scan(directory: URL) -> DirectoryNode {
-        let children = scanChildren(of: directory)
-        return DirectoryNode(
-            id: directory,
-            url: directory,
-            name: directory.lastPathComponent,
-            isDirectory: true,
-            children: children
-        )
+    @Published var children: [DirectoryNode]?
+    @Published var isExpanded: Bool = false
+
+    private init(url: URL, isDirectory: Bool) {
+        self.id = url
+        self.url = url
+        self.name = url.lastPathComponent
+        self.isDirectory = isDirectory
     }
 
-    private static func scanChildren(of directory: URL) -> [DirectoryNode] {
+    static func make(url: URL) -> DirectoryNode {
+        let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+        return DirectoryNode(url: url, isDirectory: isDir)
+    }
+
+    func loadChildrenIfNeeded() {
+        guard isDirectory, children == nil else { return }
+        children = scanImmediateChildren()
+    }
+
+    func refresh() {
+        guard isDirectory else { return }
+        isExpanded = false
+        children = scanImmediateChildren()
+    }
+
+    private func scanImmediateChildren() -> [DirectoryNode] {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(
-            at: directory,
+            at: url,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else {
@@ -31,27 +46,12 @@ struct DirectoryNode: Identifiable, Hashable {
         var dirs: [DirectoryNode] = []
         var files: [DirectoryNode] = []
 
-        for url in contents {
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-
+        for child in contents {
+            let isDir = (try? child.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
             if isDir {
-                let children = scanChildren(of: url)
-                guard !children.isEmpty else { continue }
-                dirs.append(DirectoryNode(
-                    id: url,
-                    url: url,
-                    name: url.lastPathComponent,
-                    isDirectory: true,
-                    children: children
-                ))
-            } else if url.pathExtension.lowercased() == "md" {
-                files.append(DirectoryNode(
-                    id: url,
-                    url: url,
-                    name: url.lastPathComponent,
-                    isDirectory: false,
-                    children: nil
-                ))
+                dirs.append(DirectoryNode(url: child, isDirectory: true))
+            } else if child.pathExtension.lowercased() == "md" {
+                files.append(DirectoryNode(url: child, isDirectory: false))
             }
         }
 
@@ -61,11 +61,11 @@ struct DirectoryNode: Identifiable, Hashable {
         return dirs + files
     }
 
-    func firstMarkdownFile() -> URL? {
-        if !isDirectory { return url }
-        for child in children ?? [] {
-            if let found = child.firstMarkdownFile() { return found }
-        }
-        return nil
+    static func == (lhs: DirectoryNode, rhs: DirectoryNode) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
