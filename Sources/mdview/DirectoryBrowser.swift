@@ -34,7 +34,9 @@ struct DirectoryBrowser: View {
                 appState.openFile(url)
             }
             .onAppear {
-                appState.selectedNodeURL = appState.currentFile
+                if appState.selectedNodeURL == nil {
+                    appState.selectedNodeURL = appState.currentFile
+                }
             }
         }
     }

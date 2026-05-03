@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-class AppState: ObservableObject {
+final class AppState: ObservableObject {
     @Published var currentFile: URL?
     @Published var markdownContent: String = ""
     @Published var refreshTrigger: UUID = UUID()
